@@ -12,6 +12,7 @@ import ARKit
 class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
+    var diceArray = [SCNNode]()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,15 +23,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         // Show statistics such as fps and timing information
         sceneView.showsStatistics = true
         
-        
-//        // Create a new scene
-//        let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
-//        if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
-//            diceNode.position = SCNVector3(0, 0, -0.1)
-//            sceneView.scene.rootNode.addChildNode(diceNode)
-//        }
-        
-
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -60,46 +52,88 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             let results = sceneView.hitTest(touchLocation, types: .existingPlaneUsingExtent)
             
             if let hitResult = results.first{
-                // Create a new dice
-                let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
-                if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
-                    diceNode.position = SCNVector3(
-                        x: hitResult.worldTransform.columns.3.x,
-                        y: hitResult.worldTransform.columns.3.y + diceNode.boundingSphere.radius,
-                        z: hitResult.worldTransform.columns.3.z
-                    )
-                    sceneView.scene.rootNode.addChildNode(diceNode)
-                    
-                    let randomX = Float((arc4random_uniform(4)) + 1) * (Float.pi/2)
-                    let randomZ = Float((arc4random_uniform(4)) + 1) * (Float.pi/2)
-                    
-                    diceNode.runAction(SCNAction.rotateBy(x: CGFloat(randomX) * 5,
-                                                          y: 0,
-                                                          z: CGFloat(randomZ) * 5,
-                                                          duration: 0.5))
-                }
+                addDice(atLocation: hitResult)
             }
         }
     }
     
-    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
-        if anchor is ARPlaneAnchor {
-            let planeAncor = anchor as! ARPlaneAnchor
+    func addDice(atLocation location: ARHitTestResult){
+        // Create a new dice
+        let diceScene = SCNScene(named: "art.scnassets/diceCollada.scn")!
+        if let diceNode = diceScene.rootNode.childNode(withName: "Dice", recursively: true) {
+            diceNode.position = SCNVector3(
+                x: location.worldTransform.columns.3.x,
+                y: location.worldTransform.columns.3.y + diceNode.boundingSphere.radius,
+                z: location.worldTransform.columns.3.z
+            )
+            diceArray.append(diceNode)
+            sceneView.scene.rootNode.addChildNode(diceNode)
             
-            let plane = SCNPlane(width: CGFloat(planeAncor.extent.x), height: CGFloat(planeAncor.extent.z))
+            roll(dice: diceNode)
             
-            let planeNode = SCNNode()
-            planeNode.position = SCNVector3(planeAncor.center.x, 0, planeAncor.center.z)
-            planeNode.transform = SCNMatrix4MakeRotation(-Float.pi/2, 1, 0, 0)
-            let gridMaterial = SCNMaterial()
-            gridMaterial.diffuse.contents = UIImage(named: "art.scnassets/grid.png")
-            plane.materials = [gridMaterial]
-            planeNode.geometry = plane
-            
-            node.addChildNode(planeNode)
-        } else {
-            return
+           
         }
+    }
+    
+    func roll(dice: SCNNode){
+        let randomX = Float((arc4random_uniform(4)) + 1) * (Float.pi/2)
+        let randomZ = Float((arc4random_uniform(4)) + 1) * (Float.pi/2)
+        
+        dice.runAction(SCNAction.rotateBy(x: CGFloat(randomX) * 5,
+                                              y: 0,
+                                              z: CGFloat(randomZ) * 5,
+                                              duration: 0.5))
+    }
+    
+    func rollAll(){
+        if !diceArray.isEmpty {
+            for dice in diceArray{
+                roll(dice: dice)
+            }
+        }
+    }
+    @IBAction func rollAgain(_ sender: UIBarButtonItem) {
+        rollAll()
+    }
+    @IBAction func removeAll(_ sender: UIBarButtonItem) {
+        if !diceArray.isEmpty {
+            for dice in diceArray{
+                dice.removeFromParentNode()
+            }
+        }
+    }
+    
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        rollAll()
+    }
+    
+    
+    //MARK: - ARSCNViewDelegateMethods
+    
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        guard let planeAncor = anchor as? ARPlaneAnchor else {return}
+        
+        let planeNode = createPlane(withPlaneAnchor: planeAncor)
+        
+        node.addChildNode(planeNode)
+            
+       
+    }
+    
+    
+    func createPlane(withPlaneAnchor planeAnchor: ARPlaneAnchor) -> SCNNode {
+        let plane = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
+        
+        let planeNode = SCNNode()
+        planeNode.position = SCNVector3(planeAnchor.center.x, 0, planeAnchor.center.z)
+        planeNode.transform = SCNMatrix4MakeRotation(-Float.pi/2, 1, 0, 0)
+//            let gridMaterial = SCNMaterial()
+//            gridMaterial.diffuse.contents = UIImage(named: "art.scnassets/grid.png")
+//            plane.materials = [gridMaterial]
+        planeNode.geometry = plane
+        
+        
+        return planeNode
     }
 
     
